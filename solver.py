@@ -76,17 +76,31 @@ def solve_it(input_data):
     logger.debug(f"Status name: {status_name}")
 
     # print solution if feasible solution found
-    if status == cp_model.OPTIMAL:
-        for i in nodes:
-            logger.info(f"c[{i}]: {solver.Value(c[i])}")
+    c_solution = []
+    for i in nodes:
+        logger.info(f"c[{i}]: {solver.Value(c[i])}")
+        # append color to list
+        c_solution.append(solver.Value(c[i]))
 
-    # build a trivial solution
-    # every node has its own color
-    solution = range(0, node_count)
+    # find the number of colors used
+    n_colors_used = len(set(c_solution))
+    logger.info(f"Colors used: {n_colors_used}")
+
+    # optimal solution T/F
+    if status == 4:
+        opt = 1
+    else:
+        opt = 0
+
+    # # build a trivial solution
+    # # every node has its own color
+    # solution = range(0, node_count)
 
     # prepare the solution in the specified output format
-    output_data = str(node_count) + " " + str(0) + "\n"
-    output_data += " ".join(map(str, solution))
+    # output_data = str(node_count) + " " + str(0) + "\n"
+    # output_data += " ".join(map(str, solution))
+    output_data = f"{n_colors_used} {opt}\n"
+    output_data += " ".join(map(str, c_solution))
 
     return output_data
 
