@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import logging
+from ortools.sat.python import cp_model
 
 # create development variables
 debug_mode = True
@@ -45,6 +46,40 @@ def solve_it(input_data):
         parts = line.split()
         edges.append((int(parts[0]), int(parts[1])))
 
+    # create range of nodes
+    nodes = range(node_count)
+    logger.debug(f"List of nodes: {nodes}")
+
+    # initialise model to add variables and constraints
+    model = cp_model.CpModel()
+
+    # set decision variable: what color each node should have
+    logger.debug
+    c = [model.NewIntVar(0, node_count - 1, f"c[{i}]") for i in nodes]
+
+    # set constraints - adjacent variables can't be same color
+    logger.info("Setting constraint - adjacent nodes different")
+    for e in edges:
+        logger.debug(f"{c[e[0]]} != {c[e[1]]}")
+        model.Add(c[e[0]] != c[e[1]])
+
+    # set objective - minimize the maximum color number in c
+    model.Minimize(max(c))
+
+    # create solver to solve model
+    solver = cp_model.CpSolver()
+
+    # solve model and print status
+    status = solver.Solve(model)
+    status_name = solver.StatusName(status)
+    logger.debug(f"Solver status: {status}")
+    logger.debug(f"Status name: {status_name}")
+
+    # print solution if feasible solution found
+    if status == cp_model.OPTIMAL:
+        for i in nodes:
+            logger.info(f"c[{i}]: {solver.Value(c[i])}")
+
     # build a trivial solution
     # every node has its own color
     solution = range(0, node_count)
@@ -57,7 +92,6 @@ def solve_it(input_data):
 
 
 if __name__ == "__main__":
-    import sys
 
     if len(sys.argv) > 1:
         file_location = sys.argv[1].strip()
