@@ -1,31 +1,33 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+import sys
 import logging
 
 # create development variables
 debug_mode = True
-data_path = "./data/gc_4_1"
+file_location = "./data/gc_4_1"
 
 # create logger
 logger = logging.getLogger("solver")
 logger.setLevel(logging.DEBUG)
 # create file handler which logs even debug messages
-fh = logging.FileHandler('solver.log')
+fh = logging.FileHandler("solver.log")
 fh.setLevel(logging.DEBUG)
 # create console handler with a higher log level
 ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
 # create formatter and add it to the handlers
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 fh.setFormatter(formatter)
 ch.setFormatter(formatter)
 # add the handlers to the logger
 logger.addHandler(fh)
 logger.addHandler(ch)
 
+
 def solve_it(input_data):
     # Modify this code to run your optimization algorithm
-    if debug:
+    if debug_mode:
         with open(file_location, "r") as input_data_file:
             input_data = input_data_file.read()
 
@@ -53,8 +55,6 @@ def solve_it(input_data):
 
     return output_data
 
-
-import sys
 
 if __name__ == "__main__":
     import sys
