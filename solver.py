@@ -5,18 +5,18 @@ import logging
 from ortools.sat.python import cp_model
 
 # create development variables
-debug_mode = True
+debug_mode = False
 file_location = "./data/gc_4_1"
 
 # create logger
 logger = logging.getLogger("solver")
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 # create file handler which logs even debug messages
 fh = logging.FileHandler("solver.log")
-fh.setLevel(logging.DEBUG)
+fh.setLevel(logging.INFO)
 # create console handler with a higher log level
 ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
+ch.setLevel(logging.INFO)
 # create formatter and add it to the handlers
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 fh.setFormatter(formatter)
@@ -24,7 +24,6 @@ ch.setFormatter(formatter)
 # add the handlers to the logger
 logger.addHandler(fh)
 logger.addHandler(ch)
-
 
 def solve_it(input_data):
     # Modify this code to run your optimization algorithm
@@ -58,10 +57,16 @@ def solve_it(input_data):
     c = [model.NewIntVar(0, node_count - 1, f"c[{i}]") for i in nodes]
 
     # set constraints - adjacent variables can't be same color
-    logger.info("Setting constraint - adjacent nodes different")
+    logger.debug("Setting constraint - adjacent nodes different")
     for e in edges:
         logger.debug(f"{c[e[0]]} != {c[e[1]]}")
         model.Add(c[e[0]] != c[e[1]])
+
+    # # set constraint - symmetry breaking
+    logger.debug("Setting constraint - symmetry breaking")
+    for i in range(node_count):
+        logger.debug(f"c[{i}] <= {i+1}")
+        model.Add(c[i] <= i+1)
 
     # set objective - minimize the maximum color number in c
     model.Minimize(max(c))
@@ -78,7 +83,7 @@ def solve_it(input_data):
     # print solution if feasible solution found
     c_solution = []
     for i in nodes:
-        logger.info(f"c[{i}]: {solver.Value(c[i])}")
+        logger.debug(f"c[{i}]: {solver.Value(c[i])}")
         # append color to list
         c_solution.append(solver.Value(c[i]))
 
