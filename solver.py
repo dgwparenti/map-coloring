@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import logging
-from ortools.sat.python import cp_model
+from ortools.constraint_solver import pywrapcp
 
 # create development variables
 debug_mode = False
@@ -24,6 +24,7 @@ ch.setFormatter(formatter)
 # add the handlers to the logger
 logger.addHandler(fh)
 logger.addHandler(ch)
+
 
 def solve_it(input_data):
     # Modify this code to run your optimization algorithm
@@ -50,61 +51,50 @@ def solve_it(input_data):
     logger.debug(f"List of nodes: {nodes}")
 
     # initialise model to add variables and constraints
-    model = cp_model.CpModel()
+    solver = pywrapcp.Solver("color_map")
 
     # set decision variable: what color each node should have
     logger.debug
-    c = [model.NewIntVar(0, node_count - 1, f"c[{i}]") for i in nodes]
+    c = [solver.IntVar(0, node_count - 1, f"c[{i}]") for i in nodes]
 
     # set constraints - adjacent variables can't be same color
     logger.debug("Setting constraint - adjacent nodes different")
     for e in edges:
         logger.debug(f"{c[e[0]]} != {c[e[1]]}")
-        model.Add(c[e[0]] != c[e[1]])
+        solver.Add(c[e[0]] != c[e[1]])
 
     # # set constraint - symmetry breaking
     logger.debug("Setting constraint - symmetry breaking")
     for i in range(node_count):
         logger.debug(f"c[{i}] <= {i+1}")
-        model.Add(c[i] <= i+1)
+        solver.Add(c[i] <= i + 1)
 
     # set objective - minimize the maximum color number in c
-    model.Minimize(max(c))
-
-    # create solver to solve model
-    solver = cp_model.CpSolver()
+    max_color = solver.Max(c).Var()
+    objective = solver.Minimize(max_color, 1)
 
     # solve model and print status
-    status = solver.Solve(model)
-    status_name = solver.StatusName(status)
-    logger.debug(f"Solver status: {status}")
-    logger.debug(f"Status name: {status_name}")
+    db = solver.Phase(c, solver.CHOOSE_MIN_SIZE_LOWEST_MAX, solver.ASSIGN_MIN_VALUE,)
 
     # print solution if feasible solution found
-    c_solution = []
-    for i in nodes:
-        logger.debug(f"c[{i}]: {solver.Value(c[i])}")
-        # append color to list
-        c_solution.append(solver.Value(c[i]))
+    solver.NewSearch(db, [objective])
+    num_solutions = 0
 
-    # find the number of colors used
-    n_colors_used = len(set(c_solution))
+    while solver.NextSolution():
+        # overwrite solution
+        num_solutions += 1
+        c_solution = [int(c[i].Value()) for i in nodes]
+        n_colors_used = max_color.Value() + 1
+
+    solver.EndSearch()
+    logger.info(f"Solution: {c_solution}")
     logger.info(f"Colors used: {n_colors_used}")
-
-    # optimal solution T/F
-    if status == 4:
-        opt = 1
-    else:
-        opt = 0
-
-    # # build a trivial solution
-    # # every node has its own color
-    # solution = range(0, node_count)
 
     # prepare the solution in the specified output format
     # output_data = str(node_count) + " " + str(0) + "\n"
     # output_data += " ".join(map(str, solution))
-    output_data = f"{n_colors_used} {opt}\n"
+
+    output_data = f"{n_colors_used} 0\n"
     output_data += " ".join(map(str, c_solution))
 
     return output_data
