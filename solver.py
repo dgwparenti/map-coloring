@@ -41,10 +41,11 @@ def solve_it(input_data):
 
     # create range of nodes
     nodes = range(node_count)
-
+    logger.debug(f"Nodes: {node_count}, Edges: {edge_count}")
     # initialise model to add variables and constraints
     logger.debug("Instantiating solver")
     solver = pywrapcp.Solver("color_map")
+    solver.TimeLimit(3*1000)  # 15 minutes
 
     # set decision variable: what color each node should have
     logger.debug("Creating variables")
@@ -55,10 +56,10 @@ def solve_it(input_data):
     for e in edges:
         solver.Add(c[e[0]] != c[e[1]])
 
-    # # set constraint - symmetry breaking
-    logger.debug("Creating breaking symmetry constraint")
-    for i in range(node_count):
-        solver.Add(c[i] <= i + 1)
+    # # # set constraint - symmetry breaking
+    # logger.debug("Creating breaking symmetry constraint")
+    # for i in range(node_count):
+    #     solver.Add(c[i] <= i + 1)
 
     # set objective - minimize the maximum color number in c
     logger.debug("Setting objective function")
@@ -74,18 +75,40 @@ def solve_it(input_data):
 
     logger.debug("Starting search")
     while solver.NextSolution():
+        logger.debug("Next solution found")
         # overwrite solution
         num_solutions += 1
         logger.debug(f"Solution found: {num_solutions}")
+        logger.debug("Writing solution list")
         c_solution = [int(c[i].Value()) for i in nodes]
-        n_colors_used = max_color.Value() + 1
-        if num_solutions >= 3:
-            solver.FinishCurrentSearch()
+        logger.debug("Solution written")
+        if (node_count >= 70) and (node_count < 250):
+            if num_solutions == 3:
+                logger.debug("Finishing search 70 < x < 250")
+                solver.FinishCurrentSearch()
+        elif (node_count >= 250) and (node_count < 500):
+            if num_solutions == 2:
+                logger.debug("Finishing search 250 =< x < 500")
+                solver.FinishCurrentSearch()
+        elif node_count >= 500:
+            if num_solutions == 2:
+                logger.debug("Finishing search 500 =< x")
+                solver.FinishCurrentSearch()
+        else:
+            continue
 
+    logger.debug("Ending search")
+    solver.EndSearch()
     logger.debug("Completed search")
-    # prepare the solution in the specified output format
-    # output_data = str(node_count) + " " + str(0) + "\n"
-    # output_data += " ".join(map(str, solution))
+    # logger.debug("Finding n colors used")
+    # n_colors_used = max_color.Value() + 1
+    # if solver.WallTime() > 10:
+    #     logger.debug("Timeout")
+    # if num_solutions >= 4:
+    #     solver.FinishCurrentSearch()
+
+    logger.debug("Finding n colors used")
+    n_colors_used = len(set(c_solution))
 
     output_data = f"{n_colors_used} 0\n"
     output_data += " ".join(map(str, c_solution))
