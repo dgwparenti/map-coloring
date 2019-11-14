@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import sys
 import logging
-from ortools.constraint_solver import pywrapcp
+from ortools.linear_solver import pywraplp
 
 # create logger
 logger = logging.getLogger("solver")
@@ -20,6 +20,10 @@ ch.setFormatter(formatter)
 # add the handlers to the logger
 logger.addHandler(fh)
 logger.addHandler(ch)
+
+file_location = "./data/gc_4_1"
+with open(file_location, "r") as input_data_file:
+    input_data = input_data_file.read()
 
 
 def solve_it(input_data):
@@ -42,75 +46,98 @@ def solve_it(input_data):
     # create range of nodes
     nodes = range(node_count)
     logger.debug(f"Nodes: {node_count}, Edges: {edge_count}")
-    # initialise model to add variables and constraints
+
+    # instantiate the solver
     logger.debug("Instantiating solver")
-    solver = pywrapcp.Solver("color_map")
-    solver.TimeLimit(3*1000)  # 15 minutes
+    solver = pywraplp.Solver('graph_coloring',
+                             pywraplp.Solver.CBC_MIXED_INTEGER_PROGRAMMING)
+    logger.debug("Completed instantiating solver")
+    # [START Variables]
+    # there are two variables color[x,c] = 1 meaning country x has color c, and use[c] which
+    # is 1 if the color c has been used
 
-    # set decision variable: what color each node should have
-    logger.debug("Creating variables")
-    c = [solver.IntVar(0, node_count - 1, f"c[{i}]") for i in nodes]
+    # build color[x,c]
+    color = {}
+    logger.debug("Starting to create color[x,c] variables")
+    for x in nodes:
+        for c in nodes:  # because there can be as many colors as nodes in the worst case
+            color[x, c] = solver.IntVar(0, 1, f"color[{x},{c}]")
+    logger.debug("Completed to create color[x,c] variables")
 
-    # set constraints - adjacent variables can't be same color
-    logger.debug("Creating adjacent constraint")
-    for e in edges:
-        solver.Add(c[e[0]] != c[e[1]])
+    # build use[c]
+    logger.debug("Starting to create use[c] variables")
+    use = [solver.IntVar(0, 1, f"use[{c}]") for c in nodes]
+    logger.debug("Completed to create use[c] variables")
+    logger.debug(f"Number of variables: {solver.NumVariables()}")
+    # [END Variables]
 
-    # # # set constraint - symmetry breaking
-    # logger.debug("Creating breaking symmetry constraint")
-    # for i in range(node_count):
-    #     solver.Add(c[i] <= i + 1)
+    # [START constraints]
+    # Adjacent countries cannot be the same color
+    logger.debug("Starting to build adjacency constraint")
+    for e in enumerate(edges):
+        for c in nodes:
+            solver.Add(color[edges[e[0]][0], c] + color[edges[e[0]][1], c] <=
+                       use[c], f"x:{edges[e[0]][0]} + x:{edges[e[0]][1]} <= c:{use[c]}")
+    logger.debug("Completed to build adjacency constraint")
 
-    # set objective - minimize the maximum color number in c
-    logger.debug("Setting objective function")
-    max_color = solver.Max(c).Var()
-    objective = solver.Minimize(max_color, 1)
+    # Each country can only have 1 color
+    logger.debug("Starting to build country can only have 1 color constraint")
+    for x in nodes:
+        solver.Add(solver.Sum([color[x, c] for c in nodes]) == 1)
+    logger.debug("Completed to build country can only have 1 color constraint")
 
-    # solve model and print status
-    db = solver.Phase(c, solver.CHOOSE_MIN_SIZE_LOWEST_MAX, solver.ASSIGN_MIN_VALUE,)
 
-    # print solution if feasible solution found
-    solver.NewSearch(db, [objective])
-    num_solutions = 0
+    # symmetry breaking
+    logger.debug("Starting to build symmetry breaking constraint")
+    for x in nodes:
+        for c in nodes:
+            solver.Add(color[x, c] <= x+1, f"color[{x},{c}]<={x+1}")
 
-    logger.debug("Starting search")
-    while solver.NextSolution():
-        logger.debug("Next solution found")
-        # overwrite solution
-        num_solutions += 1
-        logger.debug(f"Solution found: {num_solutions}")
-        logger.debug("Writing solution list")
-        c_solution = [int(c[i].Value()) for i in nodes]
-        logger.debug("Solution written")
-        if (node_count >= 70) and (node_count < 250):
-            if num_solutions == 3:
-                logger.debug("Finishing search 70 < x < 250")
-                solver.FinishCurrentSearch()
-        elif (node_count >= 250) and (node_count < 500):
-            if num_solutions == 2:
-                logger.debug("Finishing search 250 =< x < 500")
-                solver.FinishCurrentSearch()
-        elif node_count >= 500:
-            if num_solutions == 2:
-                logger.debug("Finishing search 500 =< x")
-                solver.FinishCurrentSearch()
-        else:
-            continue
+    logger.debug(f"Number of constraints: {solver.NumConstraints()}")
+    # [END constraints]
 
-    logger.debug("Ending search")
-    solver.EndSearch()
-    logger.debug("Completed search")
-    # logger.debug("Finding n colors used")
-    # n_colors_used = max_color.Value() + 1
-    # if solver.WallTime() > 10:
-    #     logger.debug("Timeout")
-    # if num_solutions >= 4:
-    #     solver.FinishCurrentSearch()
+    # set objective
+    obj = solver.Sum(use)
+    objective = solver.Minimize(obj)
 
-    logger.debug("Finding n colors used")
-    n_colors_used = len(set(c_solution))
+    # [START Solve]
+    logger.debug("Started solve")
+    solver.SetTimeLimit(10*60*1000)
+    result = solver.Solve()
+    logger.debug("Completed solve")
 
-    output_data = f"{n_colors_used} 0\n"
+    # [END solve]
+
+    # [START solution extraction]
+    if result == solver.OPTIMAL:
+        logger.info("Optimal solution found")
+        opt = 1
+    elif result == solver.FEASIBLE:
+        logger.info("Feasible solution found")
+        opt = 0
+    elif result == solver.INFEASIBLE:
+        logger.info("Problem is infeasible")
+    elif result == solver.NOT_SOLVED:
+        logger.info("Problem not solved")
+    else:
+        logger.debug(f"Solver status: {result}")
+        logger.debug("Unknown issue")
+
+    if opt in [0, 1]:
+        logger.debug("Finding n colors used")
+        n_colors_used = int(solver.Objective().Value())
+        logger.debug("Found objective value")
+
+        logger.debug("Extracting variable values")
+        # loop through color[x,c] and extract elements == 1 only
+        c_solution = []
+        for x in nodes:
+            for c in nodes:
+                if color[x, c].SolutionValue() == 1:
+                    c_solution.append(c)
+        logger.debug("Extracted variable values")
+
+    output_data = f"{n_colors_used} {opt}\n"
     output_data += " ".join(map(str, c_solution))
     logger.debug("Created output_data")
     return output_data

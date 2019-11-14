@@ -7,7 +7,8 @@ from ortools.constraint_solver import pywrapcp
 # create development variables
 debug_mode = False
 file_location = "./data/gc_4_1"
-
+with open(file_location, "r") as input_data_file:
+    input_data = input_data_file.read()
 # create logger
 logger = logging.getLogger("solver")
 logger.setLevel(logging.INFO)
